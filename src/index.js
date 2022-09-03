@@ -21,6 +21,12 @@ const participantsSchema = joi.object({
 	name: joi.string().empty("").required(),
 });
 
+const messagesSchema = joi.object({
+	to: joi.string().empty().required(),
+	text: joi.string().empty().required(),
+	type: joi.alternatives().try("message", "private_message"),
+});
+
 app.post("/participants", async (request, response) => {
 	try {
 		const { name } = request.body;
@@ -61,10 +67,47 @@ app.post("/participants", async (request, response) => {
 	}
 });
 
+app.get("/participants", async (request, response) => {
+	try {
+		const participants = await db.collection("users").find().toArray();
+		return response.send(participants);
+	} catch (error) {
+		console.log(error);
+		return response.sendStatus(500);
+	}
+});
+
 app.post("/messages", async (request, response) => {
 	try {
 		const { to, text, type } = request.body;
+		const validation = messagesSchema.validate(
+			{
+				to,
+				text,
+				type,
+			},
+			{ abortEarly: false }
+		);
+		if (validation.error) {
+			return response
+				.status(422)
+				.send(validation.error.details.map((item) => item.message));
+		}
+
 		const from = request.headers.user;
+		const fromCheck = await db.collection("users").findOne({ name: from });
+		if (!fromCheck) {
+			return response.status(422).send({
+				message: "Participante não existente na lista de participantes!",
+			});
+		}
+		await db.collection("messages").insertOne({
+			from,
+			to,
+			text,
+			type,
+			time: dayjs().format("HH:mm:ss"),
+		});
 		return response.sendStatus(201);
 	} catch (error) {
 		console.log(error);
