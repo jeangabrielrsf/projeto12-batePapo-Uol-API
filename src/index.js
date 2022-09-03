@@ -142,7 +142,15 @@ app.get("/messages", async (request, response) => {
 
 app.post("/status", async (request, response) => {
 	try {
-		const participant = request.headers.user;
+		const { user } = request.headers;
+		const userCheck = await db.collection("users").findOne({ name: user });
+		if (!userCheck) {
+			return response.sendStatus(404);
+		}
+		await db
+			.collection("users")
+			.updateOne({ name: user }, { $set: { lastStatus: Date.now() } });
+		return response.sendStatus(200);
 	} catch (error) {
 		console.log(error);
 		return response.sendStatus(500);
