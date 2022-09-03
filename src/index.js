@@ -117,8 +117,23 @@ app.post("/messages", async (request, response) => {
 
 app.get("/messages", async (request, response) => {
 	try {
+		const { limit } = request.query;
+		const { user } = request.headers;
+
 		const messages = await db.collection("messages").find().toArray();
-		return response.send(messages);
+		const userMessages = messages.filter(
+			(item) =>
+				item.type === "message" ||
+				item.type === "status" ||
+				(item.type === "private_message" && item.from === user) ||
+				(item.type === "private_message" && item.to === user)
+		);
+
+		if (limit) {
+			console.log("to só na aguinha, muito limitado rs");
+			return response.send(userMessages.slice(-limit).reverse());
+		}
+		return response.send(userMessages.reverse());
 	} catch (error) {
 		console.log(error);
 		return response.sendStatus(500);
