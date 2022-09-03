@@ -1,7 +1,10 @@
-import express, { response } from "express";
+import express from "express";
 import cors from "cors";
 import { MongoClient } from "mongodb";
 import dotenv from "dotenv";
+import joi from "joi";
+import dayjs from "dayjs";
+
 dotenv.config();
 
 const app = express();
@@ -14,14 +17,41 @@ mongoClient.connect(() => {
 	db = mongoClient.db("bate_papo");
 });
 
+const participantsSchema = joi.object({
+	name: joi.string().empty("").required(),
+});
+
 app.post("/participants", async (request, response) => {
 	try {
 		const { name } = request.body;
-		//FALTA VALIDAR COM A BIBLIOTECA JOY
+
+		const validation = participantsSchema.validate(
+			{ name },
+			{ abortEarly: false }
+		);
+		if (validation.error) {
+			return response
+				.status(422)
+				.send(validation.error.details.map((item) => item.message));
+		}
 		//FALTA VERIFICAR SE JÁ TEM UM NOME EXISTENTE
-		const result = await db.collection("users").insertOne({
+		const nameCheck = await db.collection("users").findOne({ name });
+
+		if (nameCheck) {
+			return response.status(409).send({ message: "Nome já está em uso!" });
+		}
+
+		const partipantResult = await db.collection("users").insertOne({
 			name,
-			lastStatus: Date.now,
+			lastStatus: Date.now(),
+		});
+
+		const enterMessage = await db.collection("messages").insertOne({
+			from: name,
+			to: "Todos",
+			text: "entra na sala...",
+			type: "status",
+			time: dayjs().format("HH:mm:ss"),
 		});
 
 		return response.sendStatus(201);
