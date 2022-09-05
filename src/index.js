@@ -1,6 +1,6 @@
 import express from "express";
 import cors from "cors";
-import { MongoClient } from "mongodb";
+import { MongoClient, ObjectId } from "mongodb";
 import dotenv from "dotenv";
 import joi from "joi";
 import dayjs from "dayjs";
@@ -180,5 +180,35 @@ setInterval(async function () {
 		return response.sendStatus(500);
 	}
 }, 15000);
+
+app.delete("/messages/:ID_DA_MENSAGEM", async (req, res) => {
+	try {
+		const { user } = req.headers;
+		console.log(user);
+		const { ID_DA_MENSAGEM } = req.params;
+		console.log(ID_DA_MENSAGEM);
+
+		const messageCheck = await db.collection("messages").findOne({
+			_id: ObjectId(ID_DA_MENSAGEM),
+		});
+		console.log(messageCheck);
+		if (!messageCheck) {
+			return res.sendStatus(404);
+		}
+
+		if (messageCheck.from !== user) {
+			return res.sendStatus(401);
+		}
+
+		await db
+			.collection("messages")
+			.deleteOne({ _id: ObjectId(ID_DA_MENSAGEM) });
+
+		return res.status(200).send({ message: "Mensagem deletada com sucesso!" });
+	} catch (error) {
+		console.log(error);
+		return res.sendStatus(500);
+	}
+});
 
 app.listen(5000, () => console.log("Listening on port 5000..."));
