@@ -156,31 +156,6 @@ app.post("/status", async (request, response) => {
 	}
 });
 
-setInterval(async function () {
-	try {
-		const participants = await db.collection("users").find().toArray();
-
-		participants.map((participant) => {
-			let deltaTime = Date.now() - participant.lastStatus;
-			if (deltaTime > 10000) {
-				const deleted = db
-					.collection("users")
-					.deleteOne({ _id: participant._id });
-				const byeMessage = db.collection("messages").insertOne({
-					from: participant.name,
-					to: "Todos",
-					text: "sai da sala...",
-					type: "status",
-					time: dayjs().format("HH:mm:ss"),
-				});
-			}
-		});
-	} catch (error) {
-		console.log(error);
-		return response.sendStatus(500);
-	}
-}, 15000);
-
 app.delete("/messages/:ID_DA_MENSAGEM", async (req, res) => {
 	try {
 		const { user } = req.headers;
@@ -210,5 +185,84 @@ app.delete("/messages/:ID_DA_MENSAGEM", async (req, res) => {
 		return res.sendStatus(500);
 	}
 });
+
+app.put("/messages/:ID_DA_MENSAGEM", async (req, res) => {
+	try {
+		const { to, text, type } = req.body;
+		const { user } = req.headers;
+		const { ID_DA_MENSAGEM } = req.params;
+
+		const validation = messagesSchema.validate(
+			{
+				to,
+				text,
+				type,
+			},
+			{ abortEarly: false }
+		);
+		if (validation.error) {
+			return res
+				.status(422)
+				.send(validation.error.details.map((item) => item.message));
+		}
+		const fromCheck = await db.collection("users").findOne({ name: user });
+		if (!fromCheck) {
+			return res.status(422).send({
+				message: "Participante não existente na lista de participantes!",
+			});
+		}
+
+		const messageCheck = await db.collection("messages").findOne({
+			_id: ObjectId(ID_DA_MENSAGEM),
+		});
+		console.log(messageCheck);
+		if (!messageCheck) {
+			return res.sendStatus(404);
+		}
+
+		if (messageCheck.from !== user) {
+			return res.sendStatus(401);
+		}
+
+		const updateMessage = await db
+			.collection("messages")
+			.updateOne(
+				{ _id: ObjectId(ID_DA_MENSAGEM) },
+				{ $set: { to: to, text: text, type: type } }
+			);
+
+		return res
+			.status(200)
+			.send({ message: "Mensagem modificada com sucesso!" });
+	} catch (error) {
+		console.log(error);
+		return res.sendStatus(500);
+	}
+});
+
+setInterval(async function () {
+	try {
+		const participants = await db.collection("users").find().toArray();
+
+		participants.map((participant) => {
+			let deltaTime = Date.now() - participant.lastStatus;
+			if (deltaTime > 10000) {
+				const deleted = db
+					.collection("users")
+					.deleteOne({ _id: participant._id });
+				const byeMessage = db.collection("messages").insertOne({
+					from: participant.name,
+					to: "Todos",
+					text: "sai da sala...",
+					type: "status",
+					time: dayjs().format("HH:mm:ss"),
+				});
+			}
+		});
+	} catch (error) {
+		console.log(error);
+		return response.sendStatus(500);
+	}
+}, 15000);
 
 app.listen(5000, () => console.log("Listening on port 5000..."));
